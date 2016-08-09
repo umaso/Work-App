@@ -75,6 +75,7 @@ public class DeviceListAdapter extends BaseAdapter {
                     .findViewById(R.id.device_name);
             viewHolder.deviceUUID = (TextView) view
                     .findViewById(R.id.device_beacon_uuid);
+
             view.setTag(viewHolder);
         } else {
             viewHolder = (ViewHolder) view.getTag();
@@ -97,5 +98,6 @@ public class DeviceListAdapter extends BaseAdapter {
         TextView deviceName;
         TextView deviceAddress;
         TextView deviceUUID;
+
     }
 }

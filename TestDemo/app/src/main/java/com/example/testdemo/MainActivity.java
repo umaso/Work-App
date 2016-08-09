@@ -18,7 +18,6 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,8 +30,9 @@ public class MainActivity extends Activity {
     private int change = 0;//用于修改按钮text
     private int change2 = 0;
     public BluetoothAdapter mBluetoothAdapter;
+    public  BluetoothDevice device;
     private int connectState;
-    private String name;
+    private String name,address;
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
         @Override
@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
             String action = intent.getAction();
             // 获得已经搜索到的蓝牙设备
             if (action.equals(BluetoothDevice.ACTION_FOUND)) {
-                BluetoothDevice device = intent
+                 device = intent
                         .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 // 搜索到的不是已经绑定的蓝牙设备
                 if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
@@ -51,50 +51,25 @@ public class MainActivity extends Activity {
                     deviceListAdapter.addDevice(beacon);
                     deviceListAdapter.notifyDataSetChanged();
                 }
-                // 如果查找到的设备符合要连接的设备，处理
-                if (device.getName().equalsIgnoreCase(name)) {
-                    mBluetoothAdapter.cancelDiscovery();//搜索蓝牙占用资源，一旦找到需要连接的设备后及时关闭搜索
-                    connectState = device.getBondState();
-                    switch (connectState) {
-                        //未配对
-                        case BluetoothDevice.BOND_NONE:
-                            //配对
-                            try {
-                                Method createBondMethod = BluetoothDevice.class.getMethod("createBond");
-                                createBondMethod.invoke(device);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                            break;
-                        //已配对
-                        case BluetoothDevice.BOND_BONDED:
-                            try {
-                                connect(device);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                            break;
-                    }
-                }
-                // 搜索完成
+
             } else if (action
                     .equals(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
                 setProgressBarIndeterminateVisibility(false);
                 setTitle("搜索蓝牙设备");
             } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
                 //状态改变的广播
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if (device.getName().equalsIgnoreCase(name)) {
                     connectState = device.getBondState();
-                    switch (connectState) {
-                        case BluetoothDevice.BOND_NONE:
-                            break;
-                        case BluetoothDevice.BOND_BONDING:
-                            break;
-                        case BluetoothDevice.BOND_BONDED:
-                            try {
-                                //连接
-                                connect(device);
+                                switch (connectState) {
+                                    case BluetoothDevice.BOND_NONE:
+                                        break;
+                                    case BluetoothDevice.BOND_BONDING:
+                                        break;
+                                    case BluetoothDevice.BOND_BONDED:
+                                        try {
+                                            //连接
+                                            connect(device);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -113,7 +88,7 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         //检测手机是否有蓝牙
@@ -232,14 +207,24 @@ public class MainActivity extends Activity {
 
 
     //连接蓝牙
-    private final class ItemClickEvent implements AdapterView.OnItemClickListener {
+    final class ItemClickEvent implements AdapterView.OnItemClickListener {
 
         @Override
         public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
 
-            String text = bluetooth_list.getItemAtPosition(i) + "";
-            Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show();
+            name = deviceListAdapter.getDevice(i).name;
+            address = deviceListAdapter.getDevice(i).bluetoothAddress;
 
+            Toast.makeText(getApplicationContext(), name, Toast.LENGTH_SHORT).show();
+
+
+            mBluetoothAdapter.cancelDiscovery();
+            device = mBluetoothAdapter.getRemoteDevice(address);
+            try {
+                ClsUtils.createBond(device.getClass(),device);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 

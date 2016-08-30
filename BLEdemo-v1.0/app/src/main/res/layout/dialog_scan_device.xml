@@ -1,0 +1,49 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    
+    android:orientation="vertical" >
+
+    <RelativeLayout
+        android:background="@color/white"
+        android:layout_width="310dp"
+        android:layout_height="360dp" >
+
+        <TextView
+            android:id="@+id/textView1"
+            android:layout_width="wrap_content"
+            android:layout_height="45dp"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="5dp"
+            android:gravity="center"
+            android:text="选择设备进行连接"
+           
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/btn_dialog_scan_cancle"
+            android:layout_width="60dp"
+            android:layout_height="45dp"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="2dp"
+            android:background="@null"
+            android:text="取消"
+            
+            android:textSize="15sp" />
+
+        <ListView
+            android:id="@+id/listview_device"
+            android:layout_width="fill_parent"
+            android:scrollbars="none"
+            android:layout_height="fill_parent"
+            android:layout_above="@+id/btn_dialog_scan_cancle"
+            android:layout_alignParentLeft="true"
+            android:layout_below="@+id/textView1"
+            android:layout_marginLeft="20dp"
+            android:layout_marginRight="20dp" >
+        </ListView>
+    </RelativeLayout>
+
+</LinearLayout>

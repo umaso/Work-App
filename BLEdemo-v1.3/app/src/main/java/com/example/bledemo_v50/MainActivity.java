@@ -9,12 +9,12 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
-import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,6 +29,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -46,6 +50,12 @@ public class MainActivity extends Activity {
     Button startButton;
     EditText info;
     /*
+    写文件属性
+     */
+    File f = new File(Environment.getExternalStorageDirectory(), "DATA.txt");
+    FileWriter fileWriter = null;
+    BufferedWriter bf;
+    /*
     需要接收的数值
      */
     //打印所需值
@@ -60,7 +70,7 @@ public class MainActivity extends Activity {
     /*
     实际接收数值
      */
-    int major;//Major     i+20-21
+    int major, low, high;//Major     i+20-21
     int power;//剩余电量  i+24
     double d1;//温度  (i+ 23)+ (i+22)/10.0D
     double d2;//距离
@@ -111,8 +121,6 @@ public class MainActivity extends Activity {
         list_data = (ListView) findViewById(R.id.list_data);
         dataAdapter = new DataAdapter(this, datalist);
         list_data.setAdapter(dataAdapter);
-        dataAdapter.notifyDataSetChanged();
-        Log.e("", "\ntime:" + timestr + "\nmajor:" + realmajor + "\nminor:" + reald1 + "\ndistance:" + reald2);
     }
 
     //数据添加到表中
@@ -127,9 +135,47 @@ public class MainActivity extends Activity {
             datalist.add(map);
             dataAdapter.notifyDataSetChanged();
             Log.e("", "\ntime:" + timestr + "\nmajor:" + realmajor + "\nminor:" + reald1 + "\ndistance:" + reald2);
+            //写入txt文件
+            writeData();
             RECEIVE = false;
         }
         return datalist;
+    }
+
+    /*
+    写txt文件
+     */
+    private void writeData() {
+        boolean sdCardExist = Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED); //判断sd卡是否存在
+        if (sdCardExist) {
+            String baseDir = Environment.getExternalStorageDirectory().getAbsolutePath();//获取SDCard目录
+            String filepath = "";//默认文件路径
+            if (f.exists()) {
+                filepath = f.getAbsolutePath();
+            } else {
+                filepath = "不适用";
+            }
+        } else if (!f.exists()) {
+            try {
+                f.createNewFile();//创建txt文件 如：testData.txt文件
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        try {
+            fileWriter = new FileWriter(f, true);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        bf = new BufferedWriter(fileWriter);
+        try {
+            bf.write(timestr + " " + realmajor + " " + reald1 + "\n");
+            bf.flush();
+            bf.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /*
@@ -171,16 +217,17 @@ public class MainActivity extends Activity {
                     uuid = str1.substring(0, 8) + "-" + str1.substring(8, 12) + "-" + str1.substring(12, 16) + "-" + str1.substring(16, 20) + "-" + str1.substring(20, 32);
                     name = bluetoothDevice.getName();
                     address = bluetoothDevice.getAddress();
-                    //  byte[] arrayOfByte2 = new byte[2];
-                    // System.arraycopy(values, 18 + (i + 4), arrayOfByte2, 0, 2);
-                    // k= ((0xFF & arrayOfByte2[0]) << 24 | (0xFF & arrayOfByte2[1]) << 16) ;
-                    major = (0xFF & values[i + 21]) + (0xFF & values[i + 21] >> 4) * 10 + (0xFF & values[i + 20]) * 100 + (0xFF & values[i + 20] >> 4) * 1000;
+                    byte[] arrayOfByte2 = new byte[2];
+                    System.arraycopy(values, i + 20, arrayOfByte2, 0, 2);
+                    low = BCDToInt(arrayOfByte2[1]);
+                    high = BCDToInt(arrayOfByte2[0]);
+                    major = low + high * 100;
                     Log.e("", "minorHexString:" + (0xFF & values[(i + 23)]) + " " + (0xFF & values[(i + 22)]) + " " + (0xFF & values[(i + 22)]) / 10);
                     d1 = (0xFF & values[(i + 23)]) + (0xFF & values[(i + 22)]) / 10.0D;
                     power = values[i + 24];
                     d2 = MainActivity.calculateAccuracy(power, rssi);
                     String hex = MainActivity.bytesToHex(values);
-                    timestr = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(System.currentTimeMillis()));
+                    timestr = new SimpleDateFormat("yyyyMMdd HH:mm:ss").format(new Date(System.currentTimeMillis()));
                     Log.e("", "当前时间：" + timestr);
                     Log.e("BLE", "Name：" + name + "\nMac：" + address + " \nUUID：" + uuid + "\nMajor：" + major + "\nMinor：" + d1 + "\nTxPower：" + power + "\nrssi：" + rssi + "\ndistance：" + d2);
                     tv_status.setText("请稍等...");
@@ -223,13 +270,28 @@ public class MainActivity extends Activity {
                                       }
                                   }
                               }
-
                 );
 
             }
         }
-
         ;
+    }
+
+    /*
+    BCD to 10str
+     */
+    public static String bcd2Str(byte[] bytes) {
+        StringBuffer temp = new StringBuffer(bytes.length * 2);
+        for (int i = 0; i < bytes.length; i++) {
+            temp.append((byte) ((bytes[i] & 0xf0) >>> 4));
+            temp.append((byte) (bytes[i] & 0x0f));
+        }
+        return temp.toString().substring(0, 1).equalsIgnoreCase("0") ? temp
+                .toString().substring(1) : temp.toString();
+    }
+
+    private static int BCDToInt(byte bcd) {
+        return (0xff & (bcd >> 4)) * 10 + (0xf & bcd);
     }
 
     /*
@@ -285,9 +347,6 @@ public class MainActivity extends Activity {
                                     int position, long arg3) {
                 //界面消失，并传值给view
                 dialog.dismiss();
-                bluetoothDevice = devicelist.get(position);
-                realAddress = bluetoothDevice.getAddress();
-                Log.e("", "实际address:" + realAddress);
             }
         });
         btn_dialgo_cancle.setOnClickListener(new OnClickListener() {
@@ -305,7 +364,6 @@ public class MainActivity extends Activity {
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, final int newState) {
             super.onConnectionStateChange(gatt, status, newState);
-//
 //            runOnUiThread(new Runnable() {
 //                @Override
 //                public void run() {
@@ -339,24 +397,24 @@ public class MainActivity extends Activity {
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
-            Log.e("", "已经进入onServicesDiscovered");
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.e("", "status=" + status);
-                List<BluetoothGattService> services = bluetoothGatt.getServices();
-                for (BluetoothGattService bluetoothGattService : services) {
-                    Log.e("", " server:" + bluetoothGattService.getUuid().toString());
-
-                    List<BluetoothGattCharacteristic> characteristic = bluetoothGattService.getCharacteristics();
-                    for (BluetoothGattCharacteristic bluetoothGattCharacteristic : characteristic) {
-                        Log.e("", " charac:" + bluetoothGattCharacteristic.getUuid().toString());
-                        if (bluetoothGattCharacteristic.getUuid().toString().equals("FDA50693-A4E2-4FB1-AFCF-C6EB07647825")) {
-                            controlCharacteristic = bluetoothGattCharacteristic;
-                        }
-                    }
-                }
-            } else {
-                Log.e("", "status===" + status);
-            }
+//            Log.e("", "已经进入onServicesDiscovered");
+//            if (status == BluetoothGatt.GATT_SUCCESS) {
+//                Log.e("", "status=" + status);
+//                List<BluetoothGattService> services = bluetoothGatt.getServices();
+//                for (BluetoothGattService bluetoothGattService : services) {
+//                    Log.e("", " server:" + bluetoothGattService.getUuid().toString());
+//
+//                    List<BluetoothGattCharacteristic> characteristic = bluetoothGattService.getCharacteristics();
+//                    for (BluetoothGattCharacteristic bluetoothGattCharacteristic : characteristic) {
+//                        Log.e("", " charac:" + bluetoothGattCharacteristic.getUuid().toString());
+//                        if (bluetoothGattCharacteristic.getUuid().toString().equals("FDA50693-A4E2-4FB1-AFCF-C6EB07647825")) {
+//                            controlCharacteristic = bluetoothGattCharacteristic;
+//                        }
+//                    }
+//                }
+//            } else {
+//                Log.e("", "status===" + status);
+//            }
         }
 
         @Override
